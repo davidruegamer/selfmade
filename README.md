@@ -1,2 +1,2 @@
 # selfmade
-SELective inFerence for Mixed and Additive Estimators
+SELective inference For Mixed and ADditive model Estimators
