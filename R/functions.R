@@ -120,10 +120,10 @@ pval_vT_cov <- function(
   vvT <- tcrossprod(vT)
   tstat <- as.numeric(vT%*%this_y)
   
-  if(!bayesian) var_est <- as.numeric(t(vT)%*%VCOV%*%(vT)) else
+  if(!bayesian) var_est <- as.numeric(vT%*%VCOV%*%t(vT)) else
     var_est <- attr(vT, "var")
-  dirV <- (VCOV%*%vT/var_est)
-  orthdir <- (diag(n) - dirV%*%t(vT))%*%this_y
+  dirV <- (VCOV%*%t(vT)/var_est)
+  orthdir <- (diag(n) - dirV%*%vT)%*%this_y
   
   samples <- gen_samples(
     orthdir = orthdir,
@@ -154,6 +154,7 @@ pval_vT_cov <- function(
 
 
 
+
 #' Function to calculate the test vector for an object fitted with \code{gamm4}
 #'
 #' @param mod an object fitted with \code{gamm4}
@@ -176,18 +177,36 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) #, plot=FALSE,
   xnames <- attr(mod$gam$terms, "term.labels")
   pnames <- c(name, setdiff(xnames, name))
   ind <- grep(name, names)
-  qs <- quantile(mod$gam$model[[name]], seq(0,1,l=nrlocs))
-  datap <- as.data.frame(cbind(qs, matrix(0, nrow = length(qs), ncol = length(pnames) - 1)))
-  names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
-  lpm <- predict(mod$gam, newdata = datap, type = "lpmatrix")
+  sterms <- sapply(mod$gam$smooth,"[[","vn")
   SigmaInv <- mod$gam$Vp
   if(is.null(sigma2)) sigma2 <- mod$gam$sig2
   
-  vTs <- lapply(1:nrow(lpm), function(j){ 
-    k <- lpm[j,]%*%SigmaInv%*%t(modmat)/sigma2
-    attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,]/sigma2)
-    return(k)
-  })
+  if(name %in% sterms)
+  {
+    if(length(nrlocs)>1) qs <- nrlocs else qs <- 
+        quantile(mod$gam$model[[name]], seq(0,1,l=nrlocs)[-c(1,nrlocs)])
+    datap <- as.data.frame(cbind(qs, matrix(0, nrow = length(qs), 
+                                            ncol = length(pnames) - 1)))
+    names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
+    lpm <- predict(mod$gam, newdata = datap, type = "lpmatrix")
+    vTs <- lapply(1:nrow(lpm), function(j){ 
+      k <- lpm[j,]%*%SigmaInv%*%t(modmat)/sigma2
+      attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])
+      attr(k, "loc") <- qs[j]
+      return(k)
+    })
+    # 
+    # return(lapply(vTs, t))
+
+  }else{
+    
+    selind <- which(colnames(modmat)==name)
+    vTs <- list((SigmaInv%*%t(modmat)/sigma2)[selind, , drop=FALSE])
+    attr(vTs[[1]], "var") <- (SigmaInv)[selind,selind]
+    
+  }
+  
+  return(vTs)
   
   # if(plot)
   # {
@@ -198,9 +217,7 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) #, plot=FALSE,
   #   points(qs, truefun(qs) - intcpt,  col="red")
   #   
   # }
-  
-  return(lapply(vTs, t))
-  
+
 }
 
 #' Function to calculate the test vector for an \code{merMod} object
@@ -240,7 +257,7 @@ testvec_for_mm <- function(
     X <- model.matrix(mod)
     vTs <- solve(crossprod(X))%*%t(X)
     if(is.null(which)) which <- 1:ncol(X)
-    return(lapply(which, function(j) vTs[j,]))
+    return(lapply(which, function(j) t(vTs[j,])))
     
   } 
   if(is.null(sig2)) sig2 <- sigma(mod)^2
@@ -302,7 +319,7 @@ testvec_for_mm <- function(
     return(vt)
   
   })
-  return(vTs)
+  return(lapply(vTs,t))
   
 }
 
