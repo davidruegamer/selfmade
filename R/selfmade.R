@@ -28,6 +28,7 @@
 #' @details Note that the additive and conditional mixed model approach currently only works for 
 #' a diagonal error covariance.
 #' 
+#' @import parallel Matrix lme4
 #' @examples
 #' 
 #' library(lme4)
@@ -78,6 +79,24 @@
 #'           checkFun = checkFun, which = 1:4, nrSamples = 50)
 #' 
 #' print(res)
+#'
+#'
+#' # gamm4 example similar to the one from gamm4 help page
+#' library(gamm4)
+#' set.seed(0) 
+#' dat <- gamSim(1,n=500,scale=2) ## simulate 4 term additive truth
+#' 
+#' dat$y <- 3 + dat$x0^2 + rnorm(n=500)
+#' br <- gamm4(y~ s(x0) + s(x1), data = dat)
+#' summary(br$gam) ## summary of gam
+#'
+#' # do not use any selection
+#' checkFun <- function(yb) TRUE
+#'
+#' res <- mocasin(br, this_y = dat$y,
+#'           checkFun = checkFun, 
+#'           nrlocs = c(0.7,1), 
+#'           nrSamples = 1000)
 #'
 mocasin <- function(
   mod, 
@@ -195,11 +214,16 @@ mocasin <- function(
   }else{
     
     
+    if(is.null(wn)) wn <- attr(mod$gam$terms, "term.labels") 
     
-    vT <- testvec_for_gamm4(mod, 
-                            name = wn, 
-                            sigma2 = sigma2, 
-                            nrlocs = nrlocs)
+    vT <- sapply(wn, function(name)
+      testvec_for_gamm4(mod, 
+                        name = name, 
+                        sigma2 = sigma2, 
+                        nrlocs = nrlocs)
+    )
+    
+    if(is.list(vT[[1]])) vT <- unlist(vT, recursive = FALSE)
     
   }
   
@@ -213,7 +237,7 @@ mocasin <- function(
                 bayesian = bayesian
     )
   )
-  names(selinf) <- wn
+  # if(!isMM) names(selinf) <- wn
   
   retl <- list(vT = vT, selinf = selinf)
   class(retl) <- "selfmade"

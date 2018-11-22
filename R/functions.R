@@ -52,17 +52,19 @@ selinf <- function(
   survr_le <- survr[!l2]
   
   # calculate the one- and two-sided p-value
-  pe <- sum(w[l2]) / sum(w)
-  pv <- 2*min(pe, 1-pe)
+  # if(all(w==0)) pv <- 0 else{
+    pe <- sum(w[l2]) / sum(w)
+    pv <- 2*min(pe, 1-pe)
+  # }
   
   # calculate the CIs
-  ftlo <- function(t) sum(exp(survr_gr * t / (var_est)) * w[l2]) / 
-    sum(exp(survr * t / (var_est)) * w)
-  ftup <- function(t) sum(exp(survr_le * t / (var_est)) * w[!l2]) / 
-    sum(exp(survr * t / (var_est)) * w)
+  ftlo <- function(t) sum(exp(survr_gr * t / (var_est[1])) * w[l2]) / 
+    sum(exp(survr * t / (var_est[2])) * w)
+  ftup <- function(t) sum(exp(survr_le * t / (var_est[1])) * w[!l2]) / 
+    sum(exp(survr * t / (var_est[2])) * w)
   
-  testvals <- seq(min(survr) - 8*sqrt(var_est), 
-                  max(survr) + 8*sqrt(var_est),
+  testvals <- seq(min(survr) - 8*sqrt(var_est[1]), 
+                  max(survr) + 8*sqrt(var_est[1]),
                   l = 1000)
   flovals <- sapply(testvals, ftlo)
   fupvals <- sapply(testvals, ftup)
@@ -112,6 +114,7 @@ pval_vT_cov <- function(
   twosided = TRUE,
   bayesian = FALSE,
   alpha = 0.05,
+  maxiter = 10,
   ...
 )
 {
@@ -135,8 +138,33 @@ pval_vT_cov <- function(
   
   # extract survived samples and weights
   survr <- samples$fac[samples$logvals]
-  w <- dnorm(survr, mean = 0, sd = sqrt(var_est)) / 
-    dnorm(survr, mean = tstat, sd = sqrt(var_est))
+  nom <- dnorm(survr, mean = 0, sd = sqrt(var_est))
+  denom <- dnorm(survr, mean = tstat, sd = sqrt(var_est))
+  
+  var_est <- rep(var_est, 2)
+  
+  while(sum(nom)==0 & all(denom!=0) & maxiter-1 > 0){
+    
+    var_est[2] <- var_est[2] * abs(tstat)/sqrt(var_est[2])
+    
+    samples <- gen_samples(
+      orthdir = orthdir,
+      dir = dirV,
+      this_sd = sqrt(var_est[1]),
+      sampFun = function(n) rnorm(n, mean = tstat, sd = var_est[2]),
+      nrSample = nrSamples,
+      checkFun = checkFun)
+   
+    survr <- samples$fac[samples$logvals]
+    nom <- dnorm(survr, mean = 0, sd = sqrt(var_est[1]))
+    denom <- dnorm(survr, mean = tstat, sd = var_est[2])
+
+    maxiter <- maxiter - 1
+    
+  }
+  
+  w <- nom / denom
+    
   
   # compute p-value and CI
   return(
@@ -189,9 +217,11 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) #, plot=FALSE,
                                             ncol = length(pnames) - 1)))
     names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
     lpm <- predict(mod$gam, newdata = datap, type = "lpmatrix")
+    # set columns to zero not associated with the variable
+    lpm[, which(!grepl(paste0("s(",name), colnames(lpm), fixed = TRUE))] <- 0
     vTs <- lapply(1:nrow(lpm), function(j){ 
       k <- lpm[j,]%*%SigmaInv%*%t(modmat)/sigma2
-      attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])
+      attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])*sigma2/mod$gam$sig2
       attr(k, "loc") <- qs[j]
       return(k)
     })
