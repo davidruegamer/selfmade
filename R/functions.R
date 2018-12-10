@@ -86,7 +86,7 @@ selinf <- function(
   
   ci <- c(low, up)
   
-  return(data.frame(nrsurv = nrsurv, pval = pv, cil = low, ciu = up))
+  return(data.frame(nrsurv = nrsurv, tstat = tstat, pval = pv, cil = low, ciu = up))
   
 }
 
@@ -204,8 +204,8 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) #, plot=FALSE,
   names <- attr(modmat, "dimnames")[[2]]
   xnames <- attr(mod$gam$terms, "term.labels")
   pnames <- c(name, setdiff(xnames, name))
-  ind <- grep(name, names)
-  sterms <- sapply(mod$gam$smooth,"[[","vn")
+  # ind <- grep(name, names)
+  sterms <- c(unlist(sapply(mod$gam$smooth,"[[","vn")), names(mod$mer@cnms))
   SigmaInv <- mod$gam$Vp
   if(is.null(sigma2)) sigma2 <- mod$gam$sig2
   
@@ -220,7 +220,7 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) #, plot=FALSE,
     # set columns to zero not associated with the variable
     lpm[, which(!grepl(paste0("s(",name), colnames(lpm), fixed = TRUE))] <- 0
     vTs <- lapply(1:nrow(lpm), function(j){ 
-      k <- lpm[j,]%*%SigmaInv%*%t(modmat)/sigma2
+      k <- lpm[j,]%*%SigmaInv%*%t(modmat)/mod$gam$sig2
       attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])*sigma2/mod$gam$sig2
       attr(k, "loc") <- qs[j]
       return(k)
@@ -230,9 +230,27 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) #, plot=FALSE,
 
   }else{
     
-    selind <- which(colnames(modmat)==name)
-    vTs <- list((SigmaInv%*%t(modmat)/sigma2)[selind, , drop=FALSE])
-    attr(vTs[[1]], "var") <- (SigmaInv)[selind,selind]
+    # # selind <- which(colnames(modmat)==name)
+    # # find name in colnames of model matrix
+    # selind <- grepl(pattern = paste0(name, "[:digit:]*"), colnames(modmat)) & 
+    #   # remove interactions
+    #   !grepl(pattern = ":", colnames(modmat), fixed=TRUE)
+    # # vTs <- list(((SigmaInv%*%t(modmat))/sigma2)[selind, , drop=FALSE])
+    # vTs <- testvec_for_mm(mod = mod$mer, which = which(selind), 
+    #                       marginal = FALSE, sig2 = sigma2, efficient = TRUE)
+    # attr(vTs[[1]], "var") <- (SigmaInv)[selind,selind]*sigma2/mod$gam$sig2
+    datap <- as.data.frame(cbind(1, matrix(0, nrow = 1, 
+                                           ncol = length(pnames) - 1)))
+    names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
+    lpm <- predict(mod$gam, newdata = datap, type = "lpmatrix")
+    # set columns to zero not associated with the variable
+    lpm[, which(!grepl(name, colnames(lpm), fixed = TRUE))] <- 0
+    vTs <- lapply(1:nrow(lpm), function(j){ 
+      k <- lpm[j,]%*%SigmaInv%*%t(modmat)/mod$gam$sig2
+      attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])*sigma2/mod$gam$sig2
+      # attr(k, "loc") <- qs[j]
+      return(k)
+    })
     
   }
   
@@ -309,7 +327,7 @@ testvec_for_mm <- function(
                         bdiag(list(solve(G))[rep(1,ncol(Z)/ncol(G))])))
     if(class(A)=="try-error") # G does not fit to the selected model
       A <- bdiag(list(matrix(0, ncol=ncol(X), nrow=ncol(X)), Lambda%*%Lambdat))
-    if(is.null(VCOV)) VCOV <- crossprod(C)/sig2 + A
+    if(is.null(VCOV)) VCOV <- Matrix::crossprod(C)/sig2 + A
     
   }
                
@@ -338,7 +356,7 @@ testvec_for_mm <- function(
         vTs <- solve(crossprod(X))%*%t(X)
   }else{ # conditional
     V0inv <- solve(VCOV)
-      vTs <- V0inv%*%t(C)/sig2 
+      vTs <- V0inv%*%Matrix::t(C)/sig2 
   }
   
   if(is.null(which)) if(marginal) which <- 1:ncol(X) else which <- 1:ncol(C)
