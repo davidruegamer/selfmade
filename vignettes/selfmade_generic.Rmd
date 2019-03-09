@@ -23,17 +23,17 @@ This vignette describes the generic use of the `selfmade` software to produce va
 
 ## Prerequisites
 
-- The framework assumes that covariates in all models are fixed and that the repsonse variable $y$ in the model is the only source of randomness.
+- The framework assumes that covariates in all models are fixed.
 - It must be possible to fit the final model with the `gamm4` function of the eponymous R package. Support for models from `mgcv` will be added in the future.
-- It must be possible to define a __deterministic__ function of a vector $y \in \mathbb{R}^n$ determining the selection result for which the practioner seeks valid inference statements, referred to as `selection_function` in the following. In other words, the user has to define a function similar to the function `selection_function` defined below, which is deterministic in the sense that for the same input `y` the output should also be the same independent of any other setting.
+- It must be possible to define a __deterministic__ function of a vector $y \in \mathbb{R}^n$ (referred to as `selection_function` in the following) determining the selection result for which the practioner seeks valid inference statements. In other words, the user has to define a function similar to the function `selection_function` defined below, which is deterministic in the sense that for the same input `y` the output should also be exactly the same.
 - It must be possible to define a function, which checks the congruency of the result of the `selection_function` and the original selection given when performing model selection on the original data $y$. This is usually trivial and just a wrapper for the `selection_function`.
 
 ```{r}
 selection_function <- function(y)
 {
   
-  # based on any input y, which can be seen as some permutation of y
-  # a model is selected, usually mapped to an integer value
+  # based on any input y of the same dimension as the original response
+  # a model is selected and mapped to an integer value
   # ....
   best_model_index <- get_best_model(list_of_models)
   
@@ -47,10 +47,10 @@ Note that the `selection_function` should return the original result when called
 ## Approach
 
 1. Run the experiment with the `original_response`
-2. Save the model selection result (e.g., as integer indicating the selected model) as well as the final model `final_model` (and refit this model with `gamm4` if a different package has beeen used for model selection)
+2. Save the model selection result (e.g., as integer indicating the selected model) as well as the final model `final_model` (after refitting the model with `gamm4` if a different package has been used for model selection)
 3. Define the model selection function (`selection_function`)
 4. Define the wrapper (`check_congruency`) function returning a logical value whether the result of any model call of `selection_function` is equivalent to the original model selection result
-5. Run
+5. Run the `mocasin`-function providing selective inference as follows:
 
 ```{r}
 res <- mocasin(mod = final_model,
@@ -70,6 +70,7 @@ res <- mocasin(mod = final_model,
 ### Example 1
 
 ```{r}
+library(selfmade)
 library(gamm4)
 set.seed(0)
 dat <- gamSim(1,n=500,scale=2) ## simulate 4 term additive truth
@@ -97,6 +98,7 @@ do.call("rbind", res$selinf)
 ### Example 2
 
 ```{r}
+library(selfmade)
 library(lme4)
 library(lmerTest)
 # use the ham data and use scaled information liking
@@ -163,7 +165,8 @@ print(res)
 
 ```{r}
 # Run an AIC comparison between different additive models 
-# fitted with mgcv::gam 
+# fitted with mgcv::gam
+library(selfmade)
 library(mgcv)
 library(gamm4)
 
