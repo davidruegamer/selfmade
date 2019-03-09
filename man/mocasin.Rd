@@ -2,12 +2,15 @@
 % Please edit documentation in R/selfmade.R
 \name{mocasin}
 \alias{mocasin}
-\title{Function which computes selective p-values and intervals for \code{gamm4} and \code{merMod} objects}
+\title{Function which computes selective p-values and intervals for \code{gamm4} and 
+\code{merMod} objects}
 \usage{
 mocasin(mod, checkFun, this_y = NULL, nrSamples = 1000,
-  bayesian = TRUE, VCOV = "est", sigma2 = "est",
-  conditional = TRUE, name = NULL, nrlocs = 7, which = NULL,
-  vT = NULL, G = NULL, efficient = TRUE)
+  bayesian = TRUE, varInTestvec = c("est", "minMod", "varY",
+  "supplied"), varForSampling = c("est", "minMod", "varY", "supplied"),
+  VCOV_vT = NULL, VCOV_sampling = NULL, conditional = TRUE,
+  name = NULL, nrlocs = 7, which = NULL, vT = NULL, G = NULL,
+  efficient = TRUE, trace = TRUE)
 }
 \arguments{
 \item{mod}{an object of class \code{merMod} or result of \code{gamm4} function}
@@ -17,41 +20,56 @@ the original response vector which returns \code{TRUE} or \code{FALSE} depending
 on whether the selection event for a given \code{y} corresponds to the 
 original model selection. See the example for more details.}
 
-\item{nrSamples}{integer; the number of Monte Carlo samples to be used for inference (defaults to 1000)}
+\item{nrSamples}{integer; the number of Monte Carlo samples to be used for 
+inference (defaults to 1000)}
 
 \item{bayesian}{logical; whether or not to use a bayesian type covariance}
 
-\item{VCOV}{covariance matrix of dimension of the response used for inference; 
-per default the estimated covariance of \code{mod} is used. 
-Otherwise a matrix must be supplied on which basis inference is conducted. If the true 
-covariance is unknown, an conservative alternative to plugging in the estimator is given 
-by using the covariance of the refitted mixed model, for which all fixed effects but the intercept 
-are excluded.}
+\item{conditional}{logical; determines whether to use the conditional or 
+marginal approach
+when \code{mod} is of class \code{merMod}, i.e., inference is sought for a 
+linear mixed model}
 
-\item{sigma2}{variance used for inference; per default the estimated variance of \code{mod} is used. 
-Other options are a conservative estimate based on the variance of the response is used ("varY")
-or to supply a numeric value to base inference on a customize variance}
+\item{name}{character; for the \code{gamm4}-case: the name of the covariate, 
+for which inference is done}
 
-\item{conditional}{logical; determines whether to use the conditional or marginal approach
-when \code{mod} is of class \code{merMod}, i.e., inference is sought for a linear mixed model}
+\item{nrlocs}{integer; for the \code{gamm4}-case: the number of locations 
+tested for non-linear effects}
 
-\item{name}{character; for the \code{gamm4}-case: the name of the covariate, for which inference is done}
+\item{which}{integer; for the \code{merMod}-case: defining the effect for 
+which inference is done}
 
-\item{nrlocs}{integer; for the \code{gamm4}-case: the number of locations tested for non-linear effects}
-
-\item{which}{integer; for the \code{merMod}-case: defining the effect for which inference is done}
-
-\item{vT}{list of vectors (optional); if inference is sought for a customized test vector, this argument
+\item{vT}{list of vectors (optional); if inference is sought for a customized 
+test vector, this argument
 can be used}
 
 \item{G}{true random effect covariance (optional)}
+
+\item{trace}{logical; if TRUE, a progress bar is printed in the console}
+
+\item{sigma2}{variance used for inference; per default the estimated variance 
+of \code{mod} is used. 
+Other options are a conservative estimate based on the variance of the 
+response is used ("varY") or to supply a numeric value to base inference 
+on a customize variance}
+
+\item{VCOV}{covariance matrix of dimension of the response used for inference; 
+per default the estimated covariance of \code{mod} is used. 
+Otherwise a matrix must be supplied on which basis inference is conducted. 
+If the true 
+covariance is unknown, an conservative alternative to plugging in the 
+estimator is given 
+by using the covariance of the refitted mixed model, for which all fixed 
+effects but the intercept 
+are excluded.}
 }
 \description{
-Function which computes selective p-values and intervals for \code{gamm4} and \code{merMod} objects
+Function which computes selective p-values and intervals for \code{gamm4} and 
+\code{merMod} objects
 }
 \details{
-Note that the additive and conditional mixed model approach currently only works for 
-a diagonal error covariance.
+Note that the additive and conditional mixed model approach 
+currently only works for a diagonal error covariance.
 }
 \examples{
 
@@ -103,5 +121,23 @@ res <- mocasin(attr(step_result, "model"), this_y = ham$Informed.liking,
           checkFun = checkFun, which = 1:4, nrSamples = 50)
 
 print(res)
+
+
+# gamm4 example similar to the one from gamm4 help page
+library(gamm4)
+set.seed(0) 
+dat <- gamSim(1,n=500,scale=2) ## simulate 4 term additive truth
+
+dat$y <- 3 + dat$x0^2 + rnorm(n=500)
+br <- gamm4(y~ s(x0) + s(x1), data = dat)
+summary(br$gam) ## summary of gam
+
+# do not use any selection
+checkFun <- function(yb) TRUE
+
+res <- mocasin(br, this_y = dat$y,
+          checkFun = checkFun, 
+          nrlocs = c(0.7,1), 
+          nrSamples = 1000)
 
 }

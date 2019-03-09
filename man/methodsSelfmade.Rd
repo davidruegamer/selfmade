@@ -10,5 +10,6 @@
 \item{x}{selfmade object}
 }
 \description{
-Generic methods which can be used for objects fitted with the \code{mocasin} function
+Generic methods which can be used for objects 
+fitted with the \code{mocasin} function
 }

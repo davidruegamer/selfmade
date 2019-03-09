@@ -5,7 +5,8 @@
 \title{Generate samples based on the decomposition of Y}
 \usage{
 gen_samples(orthdir, dir, this_sd, nrSample = 1000,
-  sampFun = function(n) rnorm(n, mean = 0, sd = this_sd), checkFun)
+  sampFun = function(n) rnorm(n, mean = 0, sd = this_sd), checkFun,
+  trace = 1)
 }
 \arguments{
 \item{orthdir}{nx1 vector; component orthogonal to the direction of interest}

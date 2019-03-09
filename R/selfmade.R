@@ -37,6 +37,7 @@
 #' test vector, this argument
 #' can be used
 #' @param G true random effect covariance (optional)
+#' @param trace logical; if TRUE, a progress bar is printed in the console
 #' 
 #' @details Note that the additive and conditional mixed model approach 
 #' currently only works for a diagonal error covariance.
@@ -127,15 +128,28 @@ mocasin <- function(
   which = NULL,
   vT = NULL,
   G = NULL,
-  efficient = TRUE
+  efficient = TRUE,
+  trace = TRUE
 )
 {
+  
   
   ######### get further setting specitivities #########
   # check type
   isMM <- inherits(x = mod, what = "merMod")
   isLM <- class(mod)=="lm"
   
+  # get response
+  if(is.null(this_y)){
+    if(isMM) this_y <- mod@resp else if(isLM)
+      this_y <- mod$y else
+        this_y <- mod$mer@resp$y
+  }  
+  
+  # match arguments for variance
+  varInTestvec = match.arg(varInTestvec)
+  varForSampling = match.arg(varForSampling)
+
   # type of VCOV
   diagCOV <- (conditional & isMM) | isLM | !isMM
   
@@ -146,8 +160,10 @@ mocasin <- function(
   ######### define further models and params ##########
   if(any("minMod" %in% c(varInTestvec, varForSampling))){
     
-    if(!isLM) # estimate IC mod
-      modIC = minMod(mod)
+    if(!isLM){ # estimate IC mod
+      if(isMM) modIC = minMod(mod) else
+        modIC = minMod(mod$mer)
+    }
     
     if(isLM){ 
       
@@ -164,12 +180,6 @@ mocasin <- function(
     
   }
   
-  # get response
-  if(is.null(this_y)){
-    if(isMM) this_y <- mod@resp else if(isLM)
-      this_y <- mod$y else
-        this_y <- mod$mer@resp
-  }  
   
   # define #obs
   n <- length(this_y)
@@ -184,10 +194,6 @@ mocasin <- function(
   #####################################################
   
   ############## define (co-)variances ################
-  # match arguments for variance
-  varInTestvec = match.arg(varInTestvec)
-  varForSampling = match.arg(varForSampling)
-  
   
   if(varInTestvec=="supplied" & 
      is.null(VCOV_vT))
@@ -294,14 +300,22 @@ mocasin <- function(
   #####################################################
   
   ############## compute selective inference ##########
-  selinf <- lapply(vT, function(vt)
-    pval_vT_cov(vT = vt,
-                VCOV = VCOV_sampling,
-                this_y = this_y,
-                nrSamples = nrSamples,
-                checkFun = checkFun,
-                bayesian = bayesian
+  pbi <- 0
+  selinf <- lapply(vT, function(vt){
+    
+    if(trace) cat("Computing inference for variable (location) ", pbi+1, "\n\n")
+    res <- pval_vT_cov(vT = vt,
+                       VCOV = VCOV_sampling,
+                       this_y = this_y,
+                       nrSamples = nrSamples,
+                       checkFun = checkFun,
+                       bayesian = bayesian,
+                       trace = trace
     )
+    if(trace) cat("\n\n")
+    pbi <<- pbi + 1
+    return(res)
+  }
   )
   # if(!isMM) names(selinf) <- wn
   ######################################################

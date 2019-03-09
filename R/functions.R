@@ -13,12 +13,23 @@ gen_samples <- function(
   this_sd,
   nrSample = 1000,
   sampFun = function(n) rnorm(n, mean = 0, sd = this_sd),
-  checkFun)
+  checkFun,
+  trace = 1)
 {
-  
+  if(trace)
+    pb <- txtProgressBar(min = 0, max = nrSample, style = 3)
   fac <- sampFun(nrSample)
-  yb <- sapply(fac, function(tau) as.numeric(orthdir + tau*dir))
-  logvals <- apply(yb, 2, checkFun)
+  yb <- lapply(fac, function(tau) as.numeric(orthdir + tau*dir))
+  logvals <- c()
+  for(i in 1:length(yb)){
+  
+    logvals[i] <- checkFun(yb[[i]])
+    if(trace){
+      setTxtProgressBar(pb, i)
+    }
+  
+  }
+  if(trace) close(pb)
   
   return(list(logvals = logvals,
               fac = fac))
@@ -115,6 +126,7 @@ pval_vT_cov <- function(
   bayesian = FALSE,
   alpha = 0.05,
   maxiter = 10,
+  trace = TRUE,
   ...
 )
 {
@@ -134,7 +146,8 @@ pval_vT_cov <- function(
     this_sd = sqrt(var_est),
     sampFun = function(n) rnorm(n, mean = tstat, sd = sqrt(var_est)),
     nrSample = nrSamples,
-    checkFun = checkFun)
+    checkFun = checkFun,
+    trace = trace)
   
   # extract survived samples and weights
   survr <- samples$fac[samples$logvals]
@@ -197,7 +210,7 @@ pval_vT_cov <- function(
 #' Function provides the test vectors for every location of the given covariate
 #' 
 #'
-testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) #, plot=FALSE, truefun=NULL, this_y=NULL)
+testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7) 
 {
   
   modmat <- model.matrix(mod$gam)

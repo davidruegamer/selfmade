@@ -10,8 +10,8 @@ library(parallel)
 library(reshape2)
 library(mvtnorm)
 source("simfun.R")
-source("functions.R")
-source("selfmade.R")
+source("../R/functions.R")
+source("../R/selfmade.R")
 
 set.seed(0) 
 

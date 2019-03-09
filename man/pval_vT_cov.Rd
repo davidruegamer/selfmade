@@ -5,7 +5,7 @@
 \title{Calculate selective p-value for given covariance}
 \usage{
 pval_vT_cov(vT, VCOV, this_y, nrSamples, checkFun, twosided = TRUE,
-  bayesian = FALSE, alpha = 0.05, ...)
+  bayesian = FALSE, alpha = 0.05, maxiter = 10, trace = TRUE, ...)
 }
 \arguments{
 \item{vT}{test vector of function}
