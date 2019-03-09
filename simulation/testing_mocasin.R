@@ -38,7 +38,7 @@ dgp <- function(n, sd) 3 + dat$x1^2 + sin(dat$x2) + rnorm(n=n, sd)
 critFun = AIC
 compareFun = which.min
 selfun = function(y) 
-  {
+{
   
   dat$y <- y
   br <- gam(y ~ x1 + x2 + s(x3) + x4, data = dat)

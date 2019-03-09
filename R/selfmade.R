@@ -1,32 +1,45 @@
-#' Function which computes selective p-values and intervals for \code{gamm4} and \code{merMod} objects
+#' Function which computes selective p-values and intervals for \code{gamm4} and 
+#' \code{merMod} objects
 #'
 #' @param mod an object of class \code{merMod} or result of \code{gamm4} function
 #' @param checkFun a function of \code{y}, a vector of the same length as 
 #' the original response vector which returns \code{TRUE} or \code{FALSE} depending
 #' on whether the selection event for a given \code{y} corresponds to the 
 #' original model selection. See the example for more details.
-#' @param nrSamples integer; the number of Monte Carlo samples to be used for inference (defaults to 1000)
+#' @param nrSamples integer; the number of Monte Carlo samples to be used for 
+#' inference (defaults to 1000)
 #' @param bayesian logical; whether or not to use a bayesian type covariance
-#' @param sigma2 variance used for inference; per default the estimated variance of \code{mod} is used. 
-#' Other options are a conservative estimate based on the variance of the response is used ("varY")
-#' or to supply a numeric value to base inference on a customize variance
+#' @param sigma2 variance used for inference; per default the estimated variance 
+#' of \code{mod} is used. 
+#' Other options are a conservative estimate based on the variance of the 
+#' response is used ("varY") or to supply a numeric value to base inference 
+#' on a customize variance
 #' @param VCOV covariance matrix of dimension of the response used for inference; 
 #' per default the estimated covariance of \code{mod} is used. 
-#' Otherwise a matrix must be supplied on which basis inference is conducted. If the true 
-#' covariance is unknown, an conservative alternative to plugging in the estimator is given 
-#' by using the covariance of the refitted mixed model, for which all fixed effects but the intercept 
+#' Otherwise a matrix must be supplied on which basis inference is conducted. 
+#' If the true 
+#' covariance is unknown, an conservative alternative to plugging in the 
+#' estimator is given 
+#' by using the covariance of the refitted mixed model, for which all fixed 
+#' effects but the intercept 
 #' are excluded.
-#' @param conditional logical; determines whether to use the conditional or marginal approach
-#' when \code{mod} is of class \code{merMod}, i.e., inference is sought for a linear mixed model
-#' @param name character; for the \code{gamm4}-case: the name of the covariate, for which inference is done
-#' @param nrlocs integer; for the \code{gamm4}-case: the number of locations tested for non-linear effects
-#' @param which integer; for the \code{merMod}-case: defining the effect for which inference is done
-#' @param vT list of vectors (optional); if inference is sought for a customized test vector, this argument
+#' @param conditional logical; determines whether to use the conditional or 
+#' marginal approach
+#' when \code{mod} is of class \code{merMod}, i.e., inference is sought for a 
+#' linear mixed model
+#' @param name character; for the \code{gamm4}-case: the name of the covariate, 
+#' for which inference is done
+#' @param nrlocs integer; for the \code{gamm4}-case: the number of locations 
+#' tested for non-linear effects
+#' @param which integer; for the \code{merMod}-case: defining the effect for 
+#' which inference is done
+#' @param vT list of vectors (optional); if inference is sought for a customized 
+#' test vector, this argument
 #' can be used
 #' @param G true random effect covariance (optional)
 #' 
-#' @details Note that the additive and conditional mixed model approach currently only works for 
-#' a diagonal error covariance.
+#' @details Note that the additive and conditional mixed model approach 
+#' currently only works for a diagonal error covariance.
 #' 
 #' @import parallel Matrix lme4
 #' @examples
@@ -104,8 +117,10 @@ mocasin <- function(
   this_y = NULL,
   nrSamples = 1000,
   bayesian = TRUE,
-  VCOV = "est",
-  sigma2 = "est",
+  varInTestvec = c("est", "minMod", "varY", "supplied"),
+  varForSampling = c("est", "minMod", "varY", "supplied"),
+  VCOV_vT = NULL,
+  VCOV_sampling = NULL,
   conditional  = TRUE,
   name = NULL, 
   nrlocs = 7,
@@ -116,22 +131,7 @@ mocasin <- function(
 )
 {
   
-
-  if(is.null(VCOV) | is.null(sigma2)) 
-    stop("VCOV and sigma2 must be supplied (see ?mocasin)")
-  
-  # save variance and covariance if given
-  if(!is.character(sigma2)){ 
-    this_sigma2 <- sigma2
-    sigma2 <- "supplied"
-  }
-  
-  this_VCOV <- NULL
-  if(!is.character(VCOV)){ 
-    this_VCOV <- VCOV
-    VCOV <- "supplied"
-  }
-  
+  ######### get further setting specitivities #########
   # check type
   isMM <- inherits(x = mod, what = "merMod")
   isLM <- class(mod)=="lm"
@@ -141,6 +141,28 @@ mocasin <- function(
   
   # set bayesian to FALSE for marginal case
   if(!conditional & isMM) bayesian <- FALSE
+  #####################################################
+  
+  ######### define further models and params ##########
+  if(any("minMod" %in% c(varInTestvec, varForSampling))){
+    
+    if(!isLM) # estimate IC mod
+      modIC = minMod(mod)
+    
+    if(isLM){ 
+      
+      sigmaIC2 <- sigma(mod)^2
+      tauIC2 <- NULL
+      
+    }else{
+      
+      
+      sigmaIC2 = sigma(modIC)^2
+      tauIC2 = getME(modIC, "theta")
+      
+    }
+    
+  }
   
   # get response
   if(is.null(this_y)){
@@ -152,37 +174,79 @@ mocasin <- function(
   # define #obs
   n <- length(this_y)
   
-  # define variance
-  if(sigma2 == "est")
-  {
-    
-    if(isLM | isMM) sigma2 <- sigma(mod)^2 else
-        sigma2 <- mod$gam$sig2
-    
-  }else if(sigma2 == "varY"){
-    
-    # plugin by Tibshirani et al. 2018
-    sigma2 <- sqrt(var(this_y)*(n-1)/n)    
-    
-  }else if(sigma2=="supplied"){
-    
-    sigma2 <- this_sigma2
-    
-  }else stop("Please supply a numeric value of one of the two options 'varY', 'est' for sigma2.")
+  # estimated variance
+  if(isLM | isMM) sigma2 <- sigma(mod)^2 else
+    sigma2 <- mod$gam$sig2
   
-  # define covariance
-  if(VCOV == "est"){
+  # plugin by Tibshirani et al. 2018
+  sigma2_y <- sqrt(var(this_y)*(n-1)/n)  
+  
+  #####################################################
+  
+  ############## define (co-)variances ################
+  # match arguments for variance
+  varInTestvec = match.arg(varInTestvec)
+  varForSampling = match.arg(varForSampling)
+  
+  
+  if(varInTestvec=="supplied" & 
+     is.null(VCOV_vT))
+      stop("Must supply VCOV_vT if varInTestvec=='supplied'")
     
-    if(diagCOV) # cond. MM, LM or AM
-      VCOV <- sigma2 * diag(rep(1,n)) else # marginal MM with plugin
-        VCOV <- extract_SigPlZGZT(mod, sig2 = sigma2)
+  
+  if(varForSampling=="supplied" & 
+    is.null(VCOV_sampling))
+      stop("Must supply VCOV_sampling if varForSampling=='supplied'")
+  
+  # if no supplied variance for testvector, define
+  
+  if(is.null(VCOV_sampling)){
+    
+    if(conditional){
       
-  }else if(VCOV == "supplied"){
-    
-    VCOV <- this_VCOV
-    
-  }else stop("Please supply a matrix or the option 'est' for VCOV.")
+      VCOV_sampling <- switch (varForSampling,
+                               est = sigma2,
+                               varY = sigma2_y,
+                               minMod = sigmaIC2
+      )
+      
+      VCOV_sampling = VCOV_sampling * diag(rep(1,n))
+      
+    }else{
+      
+      if(varForSampling == "varY")
+        stop("Option 'varY' not possible for marginal mixed model inference.")
+      
+      VCOV_sampling <- switch(varForSampling,
+                              est = vcov_RI(mod),
+                              minMod = vcov_RI(modIC)
+      )
+      
+    }
+  }
   
+  # if no supplied variance for testvector, define
+  if(is.null(VCOV_vT)){
+    
+    if(conditional){
+      
+      VCOV_vT <- switch (varInTestvec,
+                         est = NULL,
+                         varY = sigma2_y,
+                         minMod = sigmaIC2
+      )    
+
+    }else{ # marginal
+      
+      
+      
+    }
+          
+  }
+
+  #####################################################
+  
+  #### define testvector corresponding to settings ####
   
   if(!is.null(which)) wn <- which else wn <- name
   
@@ -193,17 +257,18 @@ mocasin <- function(
       vT <- testvec_for_mm(mod, 
                            marginal = !conditional, 
                            G = G, 
-                           sig2 = sigma2, 
+                           sig2 = VCOV_vT, 
                            which = wn)
 
-    }else{
+    }else{ # marginal
       
+
       # use VCOV only if supplied, else more efficient matrix inversion
       # in the testvec function
       vT <- testvec_for_mm(mod, 
                            marginal = !conditional, 
-                           VCOV = this_VCOV,
-                           sig2 = sigma2, 
+                           VCOV = VCOV_vT,
+                           sig2 = sigma2_samp, 
                            which = wn,
                            efficient = efficient)
       
@@ -211,7 +276,7 @@ mocasin <- function(
       
     }
     
-  }else{
+  }else{ # additive case
     
     
     if(is.null(wn)) wn <- attr(mod$gam$terms, "term.labels") 
@@ -219,18 +284,19 @@ mocasin <- function(
     vT <- sapply(wn, function(name)
       testvec_for_gamm4(mod, 
                         name = name, 
-                        sigma2 = sigma2, 
+                        sigma2 = VCOV_vT, 
                         nrlocs = nrlocs)
     )
     
     if(is.list(vT[[1]])) vT <- unlist(vT, recursive = FALSE)
     
   }
+  #####################################################
   
-  # compute selective inference
+  ############## compute selective inference ##########
   selinf <- lapply(vT, function(vt)
     pval_vT_cov(vT = vt,
-                VCOV = VCOV,
+                VCOV = VCOV_sampling,
                 this_y = this_y,
                 nrSamples = nrSamples,
                 checkFun = checkFun,
@@ -238,6 +304,7 @@ mocasin <- function(
     )
   )
   # if(!isMM) names(selinf) <- wn
+  ######################################################
   
   retl <- list(vT = vT, selinf = selinf)
   class(retl) <- "selfmade"
@@ -247,7 +314,8 @@ mocasin <- function(
 
 #' @title Generic methods for selfmade objects
 #' 
-#' @description Generic methods which can be used for objects fitted with the \code{mocasin} function
+#' @description Generic methods which can be used for objects 
+#' fitted with the \code{mocasin} function
 #' 
 #' @param x selfmade object
 #'
