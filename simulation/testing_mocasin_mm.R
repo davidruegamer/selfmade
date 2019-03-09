@@ -2,6 +2,7 @@
 # TODO: Clean up and use library for selfmade
 library(lme4)
 library(cAIC4)
+library(lmerTest)
 library(gamm4)
 library(Matrix)
 library(MASS)
@@ -9,9 +10,8 @@ library(ggplot2)
 library(parallel)
 library(reshape2)
 library(mvtnorm)
-source("simfun.R")
-source("../R/functions.R")
-source("../R/selfmade.R")
+source("functions.R")
+source("selfmade.R")
 
 set.seed(0) 
 
@@ -20,52 +20,37 @@ nrSamples = 500
 nrSimIter = 500
 saveResults = TRUE
 
-### create data
-centeredRN <- function() as.numeric(scale(rnorm(n), scale=F))
 
-x1 <- centeredRN()
-x2 <- centeredRN()
-x3 <- centeredRN()
-x4 <- centeredRN()
-x5 <- centeredRN()
-# x6 <- rnorm(n)
-dat <- data.frame(x1 = x1, x2 = x2, x3 = x3,
-                  x4 = x4, x5 = x5) # , x6 = x6)
-### define dgp
-dgp <- function(n, sd) 3 + dat$x1^2 + sin(dat$x2) + rnorm(n=n, sd)
+n <- 100
+p <- 6
+nrsubj <- 5
 
-### define selection functions
-critFun = AIC
-compareFun = which.min
-selfun = function(y) 
-{
-  
-  dat$y <- y
-  br <- gam(y ~ x1 + x2 + s(x3) + x4, data = dat)
-  br2 <- gam(y ~ s(x1) + x2 + x3 + x4, data = dat)
-  br3 <- gam(y ~ s(x1) + s(x2) + x3 + x4, data = dat)
-  br4 <- gam(y ~ s(x1) + x2 + s(x3) + x4, data = dat)
-  br5 <- gam(y ~ x1 + x2 + x3 + x4, data = dat)
-  ret = compareFun(sapply(list(br, br2, br3, br4, br5), critFun))
-  attr(ret, "form") = list(br, br2, br3, br4, br5)[[ret]]$formula
-  return(ret)
-}
+X <- cbind(rep(1,n), matrix(rnorm(n*(p)), ncol = p))
+
+beta <- c(2, 4, -2, 1, rep(0, p-3))
+subjind <- gl(n = nrsubj, k = n / nrsubj)
+
+etaFix <- X%*%beta
+signal <- sd(etaFix)
+
+colnames(X) <- c("Intercept", paste("V", 1:6, sep=""))
+
+dat <<- data.frame(X, subjind)
 
 ###############################################################
 ################ saving options and filenames #################
 ###############################################################
 
 
-saveName = "test_mocasin_gamAIC2_"
-regexpr = ".*AIC2\\_(.*)\\.RDS"
-plotName = "ggres_test_mocasin2"
-plot_final_result = TRUE
+saveName = "test_mocasin_mmcStep_"
+regexpr = ".*mmcStep\\_(.*)\\.RDS"
+plotName = "ggres_test_mocasin_mmc"
+plot_final_result = FALSE
 nrCores = 50
 
 ###############################################################
 ################# settings for simulation #####################
 ###############################################################
-
 
 settings = expand.grid(
   modelType = c("mixed model", "additive model"),
@@ -74,9 +59,9 @@ settings = expand.grid(
   efficient = c(TRUE, FALSE),
   varInTestvec = c("est", "minMod", "varY", "supplied"),
   varForSampling = c("est", "minMod", "varY", "supplied"),
-  sd = c(1,10)
+  SNR = c(2,4),
+  tau = c(4)
 )
-
 
 ### redefine settings (do not use this for overall simulation)
 settings$marginal = settings$modelType == "mixed model" & 
@@ -89,17 +74,19 @@ drop =
                                                settings$varForSampling == "minMod")) #| 
 
 settings <- settings[!drop,]
-# set the model type manually -- CHANGE THIS
-settings <- settings[settings$modelType=="additive model",]
-# test one sd first -- CHANGE THIS
-settings <- settings[settings$sd==4,]
+settings <- settings[settings$modelType!="additive model",]
+settings$varInTestvec <- NULL
+settings <- settings[!(!settings$conditional & settings$bayesian),]
+settings <- settings[!(settings$varForSampling=="varY" & 
+                         !settings$conditional),]
+settings <- unique(settings)
+
+# set factors to character
 settings[,sapply(settings, class)=="factor"] <- 
   lapply(settings[,sapply(settings, class)=="factor"],
          as.character)
 VCOV_vT = VCOV_sampling = NULL
-
-
-
+settings$sd = signal / settings$SNR
 
 ####################################################################
 ############### Start iterating over simulations ###################
@@ -107,12 +94,6 @@ VCOV_vT = VCOV_sampling = NULL
 
 
 for(i in 1:nrow(settings)){
-  
-  if(settings[i,"varInTestvec"]=="supplied"){
-    # supply true value
-    VCOV_vT = settings[i,"sd"]^2
-    
-  }
   
   if(settings[i,"varForSampling"]=="supplied"){
     # supply true value
@@ -123,45 +104,108 @@ for(i in 1:nrow(settings)){
   res <- mclapply(1:nrSimIter, function(j){
     
     st <- Sys.time()
+    sigma <- settings$sd[i]
+    tau <- settings$tau[i]
+    covTaus <- 0.5*(0.5*tau) # = correlation * sqrt(tau * tauSlope)
+    
+    vcovTRUE <- matrix(c(tau, covTaus, covTaus, 0.5 * tau), ncol = 2)
+    cholVCT <- chol(vcovTRUE)/sigma
+    theta <- c(cholVCT)[-2]
+    names(theta)<-c("subjind.(Intercept)",
+                    "subjind.V2.(Intercept)",
+                    "subjind.V2")
+    
+    form <- as.formula(
+      c("~ V1 + V2 + V3 + V4 + V5 + V6 + (1 + V2|subjind)")
+    )
     set.seed(j)
-    dat$y <- dgp(n=n, sd=settings[i,"sd"])
-    # r <- NULL
-    # if(checkFun(dat$y))
-    wm = selfun(dat$y)
-    checkFun <- function(yb) selfun(yb)==wm
-    r <- mocasin(mod = gamm4(formula = attr(wm,"form"), data = dat), 
-                 this_y = dat$y,
+    this_y <- simulate(form, newdata = dat, family = gaussian,
+                  newparams = list(theta = theta, beta = beta, 
+                                   sigma = settings[i,"sd"]))[[1]]
+    
+    
+    ### define selection functions
+    modFun <- function(yy) 
+    {
+      dat$y <- as.numeric(yy)
+      lmer(y ~ 1 + V1 + V2 + V3 + V4 + V5 + V6 + 
+             (1 + V2|subjind), REML = FALSE, data = dat)
+    }
+    
+    selFun <- function(mod)
+    {
+      
+      attr(step(mod, reduce.random = FALSE), "model")
+      
+    }
+    
+    extractSelFun <- function(this_mod){
+      
+      if(class(this_mod)=="lm") 
+        return(attr(this_mod$coefficients, "names")) else
+          return(c(names(fixef(this_mod)), names(getME(this_mod, "theta"))))
+      
+    }
+    
+    
+    selected_model = selFun(modFun(this_y))
+    selection = extractSelFun(selected_model)
+    # define function which checks congruency
+    checkFun <- function(yb){ 
+      
+      setequal( extractSelFun(selFun(modFun(yy = yb))), 
+                selection )
+      
+    }
+    nameFun = function(this_mod){ 
+      
+      if(length(intersect(c("V4","V5","V6"), extractSelFun(this_mod))) > 0)
+        return(which(extractSelFun(this_mod)%in%c("V4","V5","V6"))) else return(1)
+      
+    }
+    which = nameFun(selected_model)
+    if(is.null(VCOV_sampling)){
+      
+      
+      
+    }
+    r <- mocasin(mod = selected_model, 
+                 this_y = this_y,
                  checkFun = checkFun, 
-                 nrlocs = c(0.7,1), 
                  nrSamples = nrSamples,
+                 which = which,
                  bayesian = settings[i,"bayesian"],
                  conditional = settings[i,"conditional"],
                  efficient = settings[i,"efficient"],
-                 varInTestvec = settings[i,"varInTestvec"],
                  varForSampling = settings[i,"varForSampling"],
                  VCOV_sampling = VCOV_sampling,
-                 VCOV_vT = VCOV_vT)   
-    print(Sys.time()-st)
-    r$sel = wm
+                 VCOV_vT = VCOV_vT,
+                 trace = FALSE)   
+    r <- do.call("rbind", r$selinf)
+    r$variable <- extractSelFun(selected_model)[which]
+    r$sel = paste(selection, collapse=" + ")
+    r$naive_p = summary(selected_model)$coefficients[r$variable,5]
     return(r)
     
   }, mc.cores = nrCores)
   
-  if(saveResults) saveRDS(res, file=paste0(saveName,i,".RDS"))
   
   res <- res[!sapply(res, is.null)]
-  res <- do.call("rbind", lapply(res, function(r){
-    
-    sel <- r$sel
-    r <- r$selinf
-    nr <- names(r)
-    r <- do.call("rbind", lapply(r, function(x) x[,c("pval"),drop=F]))
-    r$var = nr
-    r$sel = sel
-    rmelt = melt(r, id.vars = c("sel", "var"))[,c(1,2,4)]
-    return(rmelt)
-    
-  }))
+  res <- do.call("rbind", res)
+  if(saveResults) saveRDS(res, file=paste0(saveName,i,".RDS"))
+  
+  # res <- do.call("rbind", lapply(res, function(r){
+  #   
+  #   sel <- r$sel
+  #   r <- r$selinf
+  #   nr <- names(r)
+  #   r <- do.call("rbind", lapply(r, function(x) x[,c("pval"),drop=F]))
+  #   r$var = nr
+  #   r$sel = sel
+  #   rmelt = melt(r, id.vars = c("sel", "var"))[,c(1,2,4)]
+  #   return(rmelt)
+  #   
+  # }))
   
 }
 

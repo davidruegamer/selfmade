@@ -206,6 +206,8 @@ mocasin <- function(
   
   # if no supplied variance for testvector, define
   
+  sigma2_sampling <- NULL
+  
   if(is.null(VCOV_sampling)){
     
     if(conditional){
@@ -224,12 +226,19 @@ mocasin <- function(
         stop("Option 'varY' not possible for marginal mixed model inference.")
       
       VCOV_sampling <- switch(varForSampling,
-                              est = vcov_RI(mod),
+                              est = mod@sigma^2 * diag(rep(1,n)),
                               minMod = vcov_RI(modIC)
       )
       
+      sigma2_sampling <- switch(varForSampling,
+                                varY = sigma2_y,
+                                est = mod@sigma^2,
+                                minMod = modIC@sigma^2)
+      
     }
   }
+  
+  if(is.null(sigma2_sampling)) sigma2_sampling = VCOV_sampling[1,1]
   
   # if no supplied variance for testvector, define
   if(is.null(VCOV_vT)){
@@ -274,7 +283,7 @@ mocasin <- function(
       vT <- testvec_for_mm(mod, 
                            marginal = !conditional, 
                            VCOV = VCOV_vT,
-                           sig2 = sigma2_samp, 
+                           sig2 = sigma2_sampling, 
                            which = wn,
                            efficient = efficient)
       
