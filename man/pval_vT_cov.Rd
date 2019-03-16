@@ -20,13 +20,16 @@ pval_vT_cov(vT, VCOV, this_y, nrSamples, checkFun, twosided = TRUE,
 
 \item{twosided}{logical; compute two-sided p-values?}
 
+\item{bayesian}{see \code{\link{mocasin}}}
+
+\item{alpha}{see \code{\link{mocasin}}}
+
+\item{maxiter}{maximum number of iteratoins to perform the linesearch used 
+in the sampling procedure}
+
+\item{trace}{see \code{\link{mocasin}}}
+
 \item{...}{further arguments passed to vT if specified as function}
-
-\item{coefNr}{which coefficient p-values should be calculated for}
-
-\item{bayesian_sd}{if not NULL, this variance is used as variance of the test statistic.
-The idea of this argument is to allow for usage of a bayesian covariance, but 
-this argument can also be used otherwise.}
 }
 \description{
 Calculate selective p-value for given covariance

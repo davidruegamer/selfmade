@@ -10,8 +10,7 @@ library(ggplot2)
 library(parallel)
 library(reshape2)
 library(mvtnorm)
-source("functions.R")
-source("selfmade.R")
+library(selfmade)
 
 set.seed(0) 
 
@@ -159,8 +158,26 @@ for(i in 1:nrow(settings)){
     }
     nameFun = function(this_mod){ 
       
-      if(length(intersect(c("V4","V5","V6"), extractSelFun(this_mod))) > 0)
-        return(which(extractSelFun(this_mod)%in%c("V4","V5","V6"))) else return(1)
+      sel_vars = setdiff(extractSelFun(this_mod), 
+                         c("subjind.(Intercept)",
+                           "subjind.V2.(Intercept)", 
+                           "subjind.V2"))
+      if("(Intercept)" %in% sel_vars & 
+         "V1" %in% sel_vars & 
+         "V2" %in% sel_vars & 
+         "V3" %in% sel_vars){
+        
+        # get inference for V1 if true model selected
+        # and else (if upper model), get 
+        if(length(sel_vars)==4) return(2) else
+          return(5)
+        
+      }else{
+        
+        # not correct model selected
+        if(length(sel_vars)>1) return(2) else return(1)
+        
+      }
       
     }
     which = nameFun(selected_model)
@@ -213,44 +230,32 @@ for(i in 1:nrow(settings)){
 
 if(plot_final_result){
   
-  lf <- list.files(pattern = saveName, full.names = T)
+  lf <- list.files(path = "sim_results/mm", pattern = saveName, full.names = T)
   lres <- lapply(lf, function(l){
     
     d <- readRDS(l)
-    d <- d[!sapply(d,is.null)]
-    sels <- unlist(sapply(d,"[[","sel"))
-    d <- do.call("rbind", lapply(1:length(sels), function(i){
-      var <- names(d[[i]]$selinf)
-      data <- do.call("rbind", d[[i]]$selinf)
-      data$sel <- sels[i]
-      data$var <- var
-      return(data)
-    }))
     d$setting_nr = gsub(regexpr,"\\1",l)
     return(d)
     
   })
   
   res <- do.call("rbind", lres)
-  
   settings$setting_nr = 1:nrow(settings)
-  res <- merge(res, settings, by="setting_nr")
-  
-  res$sel <- as.factor(res$sel)
-  res$varForSampling <- as.factor(res$varForSampling)
-  res$varInTestvec <- as.factor(res$varInTestvec)
+  res <- merge(res, settings, by = "setting_nr")
+  res[,c(1:6,9)] <- lapply(res[,c(1:6,9)], as.numeric)
+  res[,setdiff(7:18,9)] <- lapply(res[,setdiff(7:18,9)], as.factor)
   
   print(
     gg <- ggplot(data = res,
                  aes(sample = pval,
-                     colour = interaction(varInTestvec, varForSampling),
+                     colour = interaction(efficient, varForSampling),
                      linetype = bayesian)) +
       geom_abline(slope = 1, intercept = 0, linetype=2) +
       geom_qq(#,
         distribution = stats::qunif, size = 0.3, geom="line") +
       theme_bw() +# coord_flip() +
       xlab("Expected Quantiles") + ylab("Observed p-values") +
-      facet_grid(sel ~ var)
+      facet_grid(sel*variable ~ SNR*marginal*sd)
   )
   
   

@@ -14,6 +14,8 @@ selinf(survr, tstat, w, var_est, alpha)
 \item{w}{weights for the survived samples}
 
 \item{var_est}{(estimated) variance of the test statistic}
+
+\item{alpha}{see \code{\link{mocasin}}}
 }
 \description{
 Calculate inference based on survived samples and weights

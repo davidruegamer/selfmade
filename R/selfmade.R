@@ -9,20 +9,6 @@
 #' @param nrSamples integer; the number of Monte Carlo samples to be used for 
 #' inference (defaults to 1000)
 #' @param bayesian logical; whether or not to use a bayesian type covariance
-#' @param sigma2 variance used for inference; per default the estimated variance 
-#' of \code{mod} is used. 
-#' Other options are a conservative estimate based on the variance of the 
-#' response is used ("varY") or to supply a numeric value to base inference 
-#' on a customize variance
-#' @param VCOV covariance matrix of dimension of the response used for inference; 
-#' per default the estimated covariance of \code{mod} is used. 
-#' Otherwise a matrix must be supplied on which basis inference is conducted. 
-#' If the true 
-#' covariance is unknown, an conservative alternative to plugging in the 
-#' estimator is given 
-#' by using the covariance of the refitted mixed model, for which all fixed 
-#' effects but the intercept 
-#' are excluded.
 #' @param conditional logical; determines whether to use the conditional or 
 #' marginal approach
 #' when \code{mod} is of class \code{merMod}, i.e., inference is sought for a 
@@ -38,15 +24,46 @@
 #' can be used
 #' @param G true random effect covariance (optional)
 #' @param trace logical; if TRUE, a progress bar is printed in the console
+#' @param this_y original response vector (explicit reference may be necessary 
+#' for certain model classes)
+#' @param varInTestvec for expert use only; variance used in the test vector definition
+#' @param varForSampling variance used for inference; per default the estimated variance 
+#' of \code{mod} is used. 
+#' Other options are a conservative estimate based on the variance of the 
+#' response is used ("varY") or to supply a numeric value to base inference 
+#' on a customize variance
+#' @param VCOV_vT for expert use only; VCOV used in the test vector definition
+#' @param VCOV_sampling covariance matrix of dimension of the response used for inference; 
+#' per default the estimated covariance of \code{mod} is used. 
+#' Otherwise a matrix must be supplied on which basis inference is conducted. 
+#' If the true 
+#' covariance is unknown, an conservative alternative to plugging in the 
+#' estimator is given 
+#' by using the covariance of the refitted mixed model, for which all fixed 
+#' effects but the intercept 
+#' are excluded.
+#' @param efficient logical; whether or not to compute the test statistic based on
+#' an (efficient) weighted LS estimator instead of a OLS estimator for the marginal model
+#' 
 #' 
 #' @details Note that the additive and conditional mixed model approach 
 #' currently only works for a diagonal error covariance.
 #' 
+#' @export
 #' @import parallel Matrix lme4
+#' @importFrom stats dnorm formula model.matrix predict 
+#' quantile reformulate rnorm sigma uniroot var
+#' @importFrom utils setTxtProgressBar txtProgressBar
+#' @rawNamespace 
+#' if(getRversion() >= "3.3.0") {
+#' importFrom("stats", sigma)
+#' } else {
+#' importFrom("lme4", sigma)
+#' }
 #' @examples
 #' 
 #' library(lme4)
-#' library(lmerTest)
+#' if(require(lmerTest)){
 #' 
 #' ##### BASED ON lmerTest HELP PAGE #########
 #' # define function to fit a model based on response
@@ -90,13 +107,13 @@
 #' 
 #' # Now let's compute valid p-values conditional on the selection
 #' res <- mocasin(attr(step_result, "model"), this_y = ham$Informed.liking,
-#'           checkFun = checkFun, which = 1:4, nrSamples = 50)
+#'           checkFun = checkFun, which = 1:4, nrSamples = 50, trace = FALSE)
 #' 
-#' print(res)
-#'
+#' # print(res)
+#' } 
 #'
 #' # gamm4 example similar to the one from gamm4 help page
-#' library(gamm4)
+#' if(require(gamm4)){
 #' set.seed(0) 
 #' dat <- gamSim(1,n=500,scale=2) ## simulate 4 term additive truth
 #' 
@@ -110,8 +127,8 @@
 #' res <- mocasin(br, this_y = dat$y,
 #'           checkFun = checkFun, 
 #'           nrlocs = c(0.7,1), 
-#'           nrSamples = 1000)
-#'
+#'           nrSamples = 100)
+#' }
 mocasin <- function(
   mod, 
   checkFun,
@@ -341,6 +358,7 @@ mocasin <- function(
 #' fitted with the \code{mocasin} function
 #' 
 #' @param x selfmade object
+#' @param ... further arguments, currently unused.
 #'
 #' @method print selfmade
 #' @rdname methodsSelfmade

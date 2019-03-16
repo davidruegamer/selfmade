@@ -6,6 +6,7 @@
 #' @param nrSample integer; number of samples to be used
 #' @param sampFun function; function to generate samples from
 #' @param checkFun function; function to congruency with initial selection
+#' @param trace logical; if \code{TRUE}, a progress bar will be printed to the console
 #' 
 gen_samples <- function(
   orthdir, 
@@ -43,6 +44,7 @@ gen_samples <- function(
 #' @param tstat the original test statistic
 #' @param w weights for the survived samples
 #' @param var_est (estimated) variance of the test statistic
+#' @param alpha see \code{\link{mocasin}}
 #' 
 selinf <- function(
   survr,
@@ -107,13 +109,14 @@ selinf <- function(
 #' @param vT test vector of function
 #' @param VCOV covariance used for distribution of test statistic
 #' @param this_y original response vector
-#' @param coefNr which coefficient p-values should be calculated for
 #' @param nrSamples number of samples to be used
 #' @param checkFun function; function to congruency with initial selection
 #' @param twosided logical; compute two-sided p-values?
-#' @param bayesian_sd if not NULL, this variance is used as variance of the test statistic.
-#' The idea of this argument is to allow for usage of a bayesian covariance, but 
-#' this argument can also be used otherwise.
+#' @param bayesian see \code{\link{mocasin}}
+#' @param alpha see \code{\link{mocasin}}
+#' @param maxiter maximum number of iteratoins to perform the linesearch used 
+#' in the sampling procedure
+#' @param trace see \code{\link{mocasin}}
 #' @param ... further arguments passed to vT if specified as function
 #' 
 pval_vT_cov <- function(
@@ -292,6 +295,8 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7)
 #' @param efficient logical; whether to compute the 
 #' test vector corresponding to the efficient beta estimator
 #' in the marginal case
+#' @param G true random effect covariance
+#' @param sig2 true error variance
 #'
 #' @details 
 #' Function provides 2 different marginal test vectors
@@ -388,7 +393,7 @@ minMod <- function(mod)
 {
   
   lhs <- formula(mod)[[2]]
-  reFormula <- cAIC4:::cnms2formula(mod@cnms)
+  reFormula <- cnms2formula(mod@cnms)
   #modIC <- 
   update(mod, formula. = reformulate(c("1", reFormula), lhs))
   # return(list(sigma = getME(modIC, "sigma"),
@@ -417,3 +422,37 @@ extract_SigPlZGZT <- function(mod, sig2 = NULL)
   sig2 * (diag(n) + crossprod(getME(mod, "Lambdat") %*% getME(mod, "Zt")))
   
 }
+
+# copied from cAIC4 package
+cnms2formula <-
+  function(cnms) {
+    # A function that builds a random effects formula from the ?component names?, 
+    # a list that can be extracted from an lmerMod object by .@cnms or 
+    # getME(., "cnms").
+    #
+    # Args: 
+    #   cnms     = List from an lmerMod object by .@cnms or getME(., "cnms").
+    #
+    # Returns:
+    #   reFormula = random effects part of a lmerMod formula
+    #
+    len      <- unlist(lapply(cnms, length))
+    cnms     <- cnms[which(len != 0)]
+    charForm <- character(length(cnms))
+    
+    for(i in 1:length(cnms)) {
+      if (cnms[[i]][1] == "(Intercept)") {
+        cnms[[i]][1] <- "1"
+      } else {
+        tpv <- cnms[[i]]
+        cnms[[i]] <- append("",tpv)
+        cnms[[i]][1] <- "-1"
+      }
+      charForm[i] <- paste("(", paste(cnms[[i]], collapse = " + "), 
+                           " | ",names(cnms)[i], ")", sep = "")
+    }
+    
+    reFormula <- paste(charForm, collapse = " + ")
+    
+    return(reFormula)
+  }

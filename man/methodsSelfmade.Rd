@@ -8,6 +8,8 @@
 }
 \arguments{
 \item{x}{selfmade object}
+
+\item{...}{further arguments, currently unused.}
 }
 \description{
 Generic methods which can be used for objects 

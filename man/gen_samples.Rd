@@ -20,6 +20,8 @@ gen_samples(orthdir, dir, this_sd, nrSample = 1000,
 \item{sampFun}{function; function to generate samples from}
 
 \item{checkFun}{function; function to congruency with initial selection}
+
+\item{trace}{logical; if \code{TRUE}, a progress bar will be printed to the console}
 }
 \description{
 Generate samples based on the decomposition of Y

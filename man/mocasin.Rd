@@ -20,10 +20,33 @@ the original response vector which returns \code{TRUE} or \code{FALSE} depending
 on whether the selection event for a given \code{y} corresponds to the 
 original model selection. See the example for more details.}
 
+\item{this_y}{original response vector (explicit reference may be necessary 
+for certain model classes)}
+
 \item{nrSamples}{integer; the number of Monte Carlo samples to be used for 
 inference (defaults to 1000)}
 
 \item{bayesian}{logical; whether or not to use a bayesian type covariance}
+
+\item{varInTestvec}{for expert use only; variance used in the test vector definition}
+
+\item{varForSampling}{variance used for inference; per default the estimated variance 
+of \code{mod} is used. 
+Other options are a conservative estimate based on the variance of the 
+response is used ("varY") or to supply a numeric value to base inference 
+on a customize variance}
+
+\item{VCOV_vT}{for expert use only; VCOV used in the test vector definition}
+
+\item{VCOV_sampling}{covariance matrix of dimension of the response used for inference; 
+per default the estimated covariance of \code{mod} is used. 
+Otherwise a matrix must be supplied on which basis inference is conducted. 
+If the true 
+covariance is unknown, an conservative alternative to plugging in the 
+estimator is given 
+by using the covariance of the refitted mixed model, for which all fixed 
+effects but the intercept 
+are excluded.}
 
 \item{conditional}{logical; determines whether to use the conditional or 
 marginal approach
@@ -45,23 +68,10 @@ can be used}
 
 \item{G}{true random effect covariance (optional)}
 
+\item{efficient}{logical; whether or not to compute the test statistic based on
+an (efficient) weighted LS estimator instead of a OLS estimator for the marginal model}
+
 \item{trace}{logical; if TRUE, a progress bar is printed in the console}
-
-\item{sigma2}{variance used for inference; per default the estimated variance 
-of \code{mod} is used. 
-Other options are a conservative estimate based on the variance of the 
-response is used ("varY") or to supply a numeric value to base inference 
-on a customize variance}
-
-\item{VCOV}{covariance matrix of dimension of the response used for inference; 
-per default the estimated covariance of \code{mod} is used. 
-Otherwise a matrix must be supplied on which basis inference is conducted. 
-If the true 
-covariance is unknown, an conservative alternative to plugging in the 
-estimator is given 
-by using the covariance of the refitted mixed model, for which all fixed 
-effects but the intercept 
-are excluded.}
 }
 \description{
 Function which computes selective p-values and intervals for \code{gamm4} and 
@@ -74,7 +84,7 @@ currently only works for a diagonal error covariance.
 \examples{
 
 library(lme4)
-library(lmerTest)
+if(require(lmerTest)){
 
 ##### BASED ON lmerTest HELP PAGE #########
 # define function to fit a model based on response
@@ -118,13 +128,13 @@ checkFun <- function(yb){
 
 # Now let's compute valid p-values conditional on the selection
 res <- mocasin(attr(step_result, "model"), this_y = ham$Informed.liking,
-          checkFun = checkFun, which = 1:4, nrSamples = 50)
+          checkFun = checkFun, which = 1:4, nrSamples = 50, trace = FALSE)
 
-print(res)
-
+# print(res)
+} 
 
 # gamm4 example similar to the one from gamm4 help page
-library(gamm4)
+if(require(gamm4)){
 set.seed(0) 
 dat <- gamSim(1,n=500,scale=2) ## simulate 4 term additive truth
 
@@ -138,6 +148,6 @@ checkFun <- function(yb) TRUE
 res <- mocasin(br, this_y = dat$y,
           checkFun = checkFun, 
           nrlocs = c(0.7,1), 
-          nrSamples = 1000)
-
+          nrSamples = 100)
+}
 }

@@ -18,6 +18,10 @@ from the marginal or condition perspective}
 
 \item{VCOV}{covariance used for the construction of test vector}
 
+\item{G}{true random effect covariance}
+
+\item{sig2}{true error variance}
+
 \item{efficient}{logical; whether to compute the 
 test vector corresponding to the efficient beta estimator
 in the marginal case}
