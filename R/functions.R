@@ -233,7 +233,7 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7)
   if(name %in% sterms)
   {
     if(length(nrlocs)>1) qs <- nrlocs else qs <-
-        quantile(mod$gam$model[[name]], seq(0,1,l=nrlocs)[-c(1,nrlocs)])
+        quantile(mod$gam$model[[name]], seq(0,1,l=nrlocs+2)[-c(1,nrlocs+2)])
     datap <- as.data.frame(cbind(qs, matrix(0, nrow = length(qs),
                                             ncol = length(pnames) - 1)))
     names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
