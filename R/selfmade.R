@@ -340,7 +340,8 @@ mocasin <- function(
   selinf <- lapply(1:length(vT), function(j){
 
     vt = vT[[j]]
-    ce = complete_effect[[wn[j]]]
+    if(!is.null(complete_effect)) ce = complete_effect[[wn[j]]] else
+      ce = FALSE
     if(trace) cat("Computing inference for variable (location) ", pbi+1, "\n\n")
     res <- pval_vT_cov(vT = vt,
                        VCOV = VCOV_sampling,
