@@ -315,19 +315,23 @@ mocasin <- function(
 
   }else{ # additive case
 
-
+    wn <- paste(name, collapse = ",")
     if(is.null(wn)) wn <- attr(mod$gam$terms, "term.labels")
     if(is.null(complete_effect)){ 
       complete_effect <- rep(FALSE, length(wn))
       names(complete_effect) <- wn
+    } else {
+      names(complete_effect) <- paste(wn, collapse = ",")
     }
+    if(length(name) != 1 & (is.null(complete_effect)|(!complete_effect)))
+      stop("Single point evaluation only for univariate effects!")
     
     vT <- sapply(wn, function(name)
       res <- testvec_for_gamm4(mod,
                                name = name,
                                sigma2 = VCOV_vT,
                                nrlocs = nrlocs,
-                               complete_effect[[name]])
+                               complete_effect = complete_effect[[name]])
     )
     
     if(is.list(vT[[1]])) vT <- unlist(vT, recursive = FALSE)
