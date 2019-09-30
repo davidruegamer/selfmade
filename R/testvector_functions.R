@@ -18,6 +18,7 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
                               complete_effect = FALSE)
 {
   
+  if (grepl(",",name)) name <- unlist(strsplit(name, ","))
   modmat <- model.matrix(mod$gam)
   names <- attr(modmat, "dimnames")[[2]]
   xnames <- attr(mod$gam$terms, "term.labels")
@@ -32,7 +33,7 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
   SigmaInv <- mod$gam$Vp
   if(is.null(sigma2)) sigma2 <- mod$gam$sig2
   
-  if(name %in% sterms)
+  if(all(name %in% sterms))
   {
     if(complete_effect){
       # Adapted from iboost package (https://github.com/davidruegamer/iboost/)
@@ -44,7 +45,12 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
         return(svdx$u[, inds, drop = FALSE])
       }
       
+      if (length(name) == 1) {
       ind_effect <- which(grepl(paste0("s(",name), colnames(modmat), fixed = TRUE))
+      }
+      if (length(name) == 2) {
+        ind_effect <- which(grepl(paste0("te(",paste(name, collapse = ",")), colnames(modmat), fixed = TRUE))
+      }
       
       Xj <- modmat[,ind_effect]
       Xminusj <- svdu_thresh(modmat[,setdiff(1:ncol(modmat),ind_effect)])
