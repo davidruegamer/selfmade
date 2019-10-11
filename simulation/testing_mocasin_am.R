@@ -134,11 +134,19 @@ for(i in 1:nrow(settings)){
     # supply true value
     VCOV_vT = settings[i,"sd"]^2
     
+  }else{
+    
+    VCOV_vT = NULL
+    
   }
   
   if(settings[i,"varForSampling"]=="supplied"){
     # supply true value
     VCOV_sampling = settings[i,"sd"]^2 * diag(rep(1,n))
+    
+  }else{
+    
+    VCOV_sampling = NULL
     
   }
   

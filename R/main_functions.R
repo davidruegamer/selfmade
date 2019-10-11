@@ -129,8 +129,8 @@ pval_vT_cov <- function(
     survr <- rBs[ss$logvals]
     
     Z <- Z/sqrt(var)
-    s <- survr/sqrt(var)
-    w <- (s^(m-1)) * (exp(-s^2/2)) / dnorm(s, mean = Z, sd = sigma1)
+    survr <- survr/sqrt(var)
+    w <- (survr^(m-1)) * (exp(-survr^2/2)) / dnorm(survr, mean = Z, sd = sigma1)
     var_est <- var
     tstat <- Z
     
