@@ -211,7 +211,7 @@ mocasin <- function(
     sigma2 <- mod$gam$sig2
 
   # plugin by Tibshirani et al. 2018
-  sigma2_y <- sqrt(var(this_y)*(n-1)/n)
+  sigma2_y <- var(this_y)*(n-1)/n
 
   #####################################################
 
