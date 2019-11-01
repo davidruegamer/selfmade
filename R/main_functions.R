@@ -11,7 +11,10 @@ selinf <- function(
   tstat,
   w,
   var_est,
-  alpha
+  alpha,
+  multiple = 8,
+  nr_testvals = multiple * 1000,
+  allow_smaller_alphas = FALSE
 )
 {
 
@@ -36,24 +39,56 @@ selinf <- function(
   ftup <- function(t) sum(exp(survr_le * t / (var_est[1])) * w[!l2]) /
     sum(exp(survr * t / (var_est[2])) * w)
 
-  testvals <- seq(min(survr) - 8*sqrt(var_est[1]),
-                  max(survr) + 8*sqrt(var_est[1]),
-                  l = 1000)
+  testvals <- seq(min(survr) - multiple*sqrt(var_est[1]),
+                  max(survr) + multiple*sqrt(var_est[1]),
+                  l = nr_testvals)
   flovals <- sapply(testvals, ftlo)
   fupvals <- sapply(testvals, ftup)
   ll <- min(which(!is.na(flovals) &
-                    !is.nan(flovals)))
+                    !is.nan(flovals) & 
+                    flovals!=0))
   lu <- max(which(!is.na(flovals) &
                     !is.nan(flovals)))
+  
+  testvals_tbu <- testvals[c(ll,lu)]
 
-  low <- try(uniroot(f = function(x) ftlo(x) - alpha/2,
-                     interval = testvals[c(ll,lu)],
-                     extendInt = "upX")$root)
-
-  up <- try(uniroot(f = function(x) ftup(x) - alpha/2,
-                    interval = testvals[c(ll,lu)],
-                    extendInt = "downX")$root)
-
+  if(any(flovals[c(ll,lu)]>0)){
+    low <- try(uniroot(f = function(x) ftlo(x) - alpha/2,
+                       interval = testvals_tbu,
+                       extendInt = "upX")$root, silent = TRUE)
+    if(allow_smaller_alphas){
+      
+      low <- max(testvals_tbu)
+      warning("Lower interval limit is not the ",
+              alpha/2*100, "%-quantile, but the (",
+              signif(ftlo(low)/100,3), ")%-quantile.")
+      
+    }
+  }else{
+    warning("Calculating ", alpha/2, " quantile not possible. ", 
+            "Observed test statistic correpsonds to the 0% quantile, ",
+            "returning -Inf as upper interval limit.")
+    low <- -Inf
+  }
+  
+  if(any(fupvals[c(ll,lu)]<1)){
+    up <- try(uniroot(f = function(x) ftup(x) - alpha/2,
+                      interval = testvals_tbu,
+                      extendInt = "downX")$root, silent = TRUE)
+    if(allow_smaller_alphas){
+      
+      up <- maxse(testvals_tbu)
+      warning("Upper interval limit is not the ",
+              (1-alpha/2)*100, "%-quantile, but the (",
+              signif((1-ftup(up))/100,3), ")%-quantile.")
+      
+    }
+  }else{
+    warning("Calculating ", 1-alpha/2, "%-quantile not possible. ", 
+            "Observed test statistic correpsonds to the 100%-quantile, ",
+            "returning Inf as upper interval limit.")
+    up <- Inf
+  }
   if(class(low)=="try-error") low <- -Inf
   if(class(up)=="try-error") up <- Inf
 
