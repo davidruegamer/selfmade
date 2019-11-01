@@ -35,9 +35,9 @@ selinf <- function(
 
   # calculate the CIs
   ftlo <- function(t) sum(exp(survr_gr * t / (var_est[1])) * w[l2]) /
-    sum(exp(survr * t / (var_est[2])) * w)
+    sum(exp(survr * t / (var_est[1])) * w)
   ftup <- function(t) sum(exp(survr_le * t / (var_est[1])) * w[!l2]) /
-    sum(exp(survr * t / (var_est[2])) * w)
+    sum(exp(survr * t / (var_est[1])) * w)
 
   testvals <- seq(min(survr) - multiple*sqrt(var_est[1]),
                   max(survr) + multiple*sqrt(var_est[1]),
