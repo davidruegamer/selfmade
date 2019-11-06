@@ -66,3 +66,47 @@ cnms2formula <-
     
     return(reFormula)
   }
+
+
+hatmatfun_gamm <- function(obj, 
+                           nr_smooths=length(obj$gam$smooth), 
+                           what=c("Vmat", "hatmat", "coefmat")
+){
+  
+  # special hat matrix for gamms
+  # see https://researchportal.bath.ac.uk/files/9228764/tgamm4.pdf
+  # page 15
+  
+  what <- match.arg(what)
+  
+  lmeobj <- obj$lme
+  gamobj <- obj$gam
+  y <- gamobj$y
+  X <- predict(gamobj, type = "lpmatrix")
+  sigma2 <- gamobj$sig2
+  
+  Vlme <- extract.lme.cov2(lmeobj,
+                           gamobj$model,
+                           nr_smooths+1)
+  Vlme_ind <- Vlme$ind
+  Vlme <- Vlme$V
+  if(is.list(Vlme)) Vlme <- Matrix::bdiag(Vlme)
+  
+  nr_fixef <- length(attr(gamobj$pterms,"term.labels")) + 
+    attr(mod$gam$terms,"intercept")
+  P <- Matrix::bdiag(append(rep(0,nr_fixef),
+                            lapply(1:length(gamobj$smooth),
+                                   function(i) gamobj$sp[i] * 
+                                     Reduce(sum, gamobj$smooth[[i]]$S))))
+  bayV <- gamobj$Vp
+  
+  # this is not very stable. Should switch to the approach by mgcv
+  # in the near future.
+  vlmeinv = solve(Vlme)
+  Vmat <- solve(t(X[Vlme_ind,])%*%vlmeinv%*%X[Vlme_ind,] + P/sigma2)
+  if(what=="Vmat") return(Vmat)
+  coefmat <- Vmat%*%t(X)%*%vlmeinv
+  if(what=="coefmat") return(coefmat)
+  if(what=="hatmat") return(X%*%coefmat) else return(coefmat%*%y)
+  
+}
