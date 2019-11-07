@@ -70,7 +70,7 @@ cnms2formula <-
 
 hatmatfun_gamm <- function(obj, 
                            nr_smooths=length(obj$gam$smooth), 
-                           what=c("Vmat", "hatmat", "coefmat")
+                           what=c("Vmat", "hatmat", "coefmat","coef")
 ){
   
   # special hat matrix for gamms
@@ -85,25 +85,62 @@ hatmatfun_gamm <- function(obj,
   X <- predict(gamobj, type = "lpmatrix")
   sigma2 <- gamobj$sig2
   
-  Vlme <- extract.lme.cov2(lmeobj,
-                           gamobj$model,
-                           nr_smooths+1)
-  Vlme_ind <- Vlme$ind
-  Vlme <- Vlme$V
-  if(is.list(Vlme)) Vlme <- Matrix::bdiag(Vlme)
+  # Switch to the more efficient version?
+  Vlme <- extract.lme.cov(lmeobj,
+                          gamobj$model,
+                          nr_smooths+1)
   
   nr_fixef <- length(attr(gamobj$pterms,"term.labels")) + 
     attr(mod$gam$terms,"intercept")
-  P <- Matrix::bdiag(append(rep(0,nr_fixef),
-                            lapply(1:length(gamobj$smooth),
-                                   function(i) gamobj$sp[i] * 
-                                     Reduce(sum, gamobj$smooth[[i]]$S))))
+  # P <- Matrix::bdiag(append(rep(0,nr_fixef),
+  #                           lapply(1:length(gamobj$smooth),
+  #                                  function(i) gamobj$sp[i] * 
+  #                                    Reduce(sum, gamobj$smooth[[i]]$S))))
+  
+  first.para <- sapply(1:length(gamobj$smooth), function(i) gamobj$smooth[[i]]$first.para)
+  last.para <- sapply(1:length(gamobj$smooth), function(i) gamobj$smooth[[i]]$last.para)
+  nxf <- ncol(X)
+  k <- 1
+  
+  S <- matrix(0, nxf, nxf)
+  
+  for (i in 1:length(gamobj$smooth)) {
+    if (is.null(gamobj$smooth[[i]]$fac)) {
+      ind <- first.para[i]:last.para[i]
+      ns <- length(gamobj$smooth[[i]]$S)
+      if (ns) 
+        for (l in 1:ns) {
+          S[ind, ind] <- S[ind, ind] + gamobj$smooth[[i]]$S[[l]] * 
+            gamobj$sp[k]
+          k <- k + 1
+        }
+    }
+    else {
+      flev <- levels(gamobj$smooth[[i]]$fac)
+      ind <- first.para[i]:(first.para[i] + gamobj$smooth[[i]]$n.para - 
+                              1)
+      ns <- length(gamobj$smooth[[i]]$S)
+      for (j in 1:length(flev)) {
+        if (ns) 
+          for (l in 1:ns) {
+            S[ind, ind] <- S[ind, ind] + gamobj$smooth[[i]]$S[[l]] * 
+              gamobj$sp[k]
+            k <- k + 1
+          }
+        k <- k - ns
+        ind <- ind + gamobj$smooth[[i]]$n.para
+      }
+      k <- k + ns
+    }
+  }
+  
+  
   bayV <- gamobj$Vp
   
   # this is not very stable. Should switch to the approach by mgcv
   # in the near future.
   vlmeinv = solve(Vlme)
-  Vmat <- solve(t(X[Vlme_ind,])%*%vlmeinv%*%X[Vlme_ind,] + P/sigma2)
+  Vmat <- solve(t(X)%*%vlmeinv%*%X + S/sigma2)
   if(what=="Vmat") return(Vmat)
   coefmat <- Vmat%*%t(X)%*%vlmeinv
   if(what=="coefmat") return(coefmat)
