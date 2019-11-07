@@ -66,6 +66,7 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
       names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
       lpm <- predict(mod$gam, newdata = datap, type = "lpmatrix")
       # set columns to zero not associated with the variable
+      
       lpm[, which(!grepl(paste0("s(",name), colnames(lpm), fixed = TRUE))] <- 0
       vTs <- lapply(1:nrow(lpm), function(j){
         k <- lpm[j,]%*%SigmaInv%*%t(modmat)/mod$gam$sig2
@@ -91,12 +92,15 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
     #                       marginal = FALSE, sig2 = sigma2, efficient = TRUE)
     # attr(vTs[[1]], "var") <- (SigmaInv)[selind,selind]*sigma2/mod$gam$sig2
     
+    if(length(nrlocs)>1) qs <- nrlocs else qs <-
+        quantile(mod$gam$model[[name]], seq(0,1,l=nrlocs+2)[-c(1,nrlocs+2)])
     datap <- as.data.frame(cbind(1, matrix(0, nrow = 1,
                                             ncol = length(pnames) - 1)))
     names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
     lpm <- predict(mod$gam, newdata = datap, type = "lpmatrix")
     # set columns to zero not associated with the variable
-    lpm[, which(!grepl(name, colnames(lpm), fixed = TRUE))] <- 0
+    this_name <- paste0("\\b",name,"\\b")
+    lpm[, which(!grepl(this_name, colnames(lpm)))] <- 0
     
     if("gamm" %in% class(mod)){
       
@@ -110,6 +114,7 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
       
     }else{
     
+      warning("gamm4 inference currently not well tested.")
       vTs <- lapply(1:nrow(lpm), function(j){
         k <- lpm[j,]%*%SigmaInv%*%t(modmat)/mod$gam$sig2
         attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])*sigma2/mod$gam$sig2
