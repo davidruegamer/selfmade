@@ -90,18 +90,32 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
     # vTs <- testvec_for_mm(mod = mod$mer, which = which(selind),
     #                       marginal = FALSE, sig2 = sigma2, efficient = TRUE)
     # attr(vTs[[1]], "var") <- (SigmaInv)[selind,selind]*sigma2/mod$gam$sig2
+    
     datap <- as.data.frame(cbind(1, matrix(0, nrow = 1,
-                                           ncol = length(pnames) - 1)))
+                                            ncol = length(pnames) - 1)))
     names(datap) <- pnames[apply(sapply(pnames, grepl, x = names), 2, any)]
     lpm <- predict(mod$gam, newdata = datap, type = "lpmatrix")
     # set columns to zero not associated with the variable
     lpm[, which(!grepl(name, colnames(lpm), fixed = TRUE))] <- 0
-    vTs <- lapply(1:nrow(lpm), function(j){
-      k <- lpm[j,]%*%SigmaInv%*%t(modmat)/mod$gam$sig2
-      attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])*sigma2/mod$gam$sig2
-      # attr(k, "loc") <- qs[j]
-      return(k)
-    })
+    
+    if("gamm" %in% class(mod)){
+      
+      hm_obj <- hatmatfun_gamm(mod)
+      vTs <- lapply(1:nrow(lpm), function(j){
+        k <- lpm[j,]%*%hm_obj[[2]]
+        attr(k, "var") <- as.numeric(lpm[j,]%*%hm_obj[[1]]%*%lpm[j,])*sigma2/mod$gam$sig2
+        # attr(k, "loc") <- qs[j]
+        return(k)
+      })
+      
+    }else{
+    
+      vTs <- lapply(1:nrow(lpm), function(j){
+        k <- lpm[j,]%*%SigmaInv%*%t(modmat)/mod$gam$sig2
+        attr(k, "var") <- as.numeric(lpm[j,]%*%SigmaInv%*%lpm[j,])*sigma2/mod$gam$sig2
+        # attr(k, "loc") <- qs[j]
+        return(k)
+      })
     
   }
   
