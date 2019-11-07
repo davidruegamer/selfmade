@@ -117,6 +117,8 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
         return(k)
       })
     
+    }
+    
   }
   
   return(vTs)
