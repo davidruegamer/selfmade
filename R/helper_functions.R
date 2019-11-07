@@ -69,15 +69,14 @@ cnms2formula <-
 
 
 hatmatfun_gamm <- function(obj, 
-                           nr_smooths=length(obj$gam$smooth), 
-                           what=c("Vmat", "hatmat", "coefmat","coef")
+                           nr_smooths=length(obj$gam$smooth)
 ){
   
   # special hat matrix for gamms
   # see https://researchportal.bath.ac.uk/files/9228764/tgamm4.pdf
   # page 15
   
-  what <- match.arg(what)
+  # what <- match.arg(what)
   
   lmeobj <- obj$lme
   gamobj <- obj$gam
@@ -141,9 +140,10 @@ hatmatfun_gamm <- function(obj,
   # in the near future.
   vlmeinv = solve(Vlme)
   Vmat <- solve(t(X)%*%vlmeinv%*%X + S/sigma2)
-  if(what=="Vmat") return(Vmat)
+  # if(what=="Vmat") return(Vmat)
   coefmat <- Vmat%*%t(X)%*%vlmeinv
-  if(what=="coefmat") return(coefmat)
-  if(what=="hatmat") return(X%*%coefmat) else return(coefmat%*%y)
+  # if(what=="coefmat") return(coefmat)
+  # if(what=="hatmat") return(X%*%coefmat) else return(coefmat%*%y)
+  return(list(Vmat, coefmat))
   
 }
