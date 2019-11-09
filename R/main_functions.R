@@ -91,7 +91,7 @@ selinf <- function(
       
       warning("Upper interval limit is not the ",
               (1-alpha/2)*100, "%-quantile, but the (",
-              signif(ftlo(up)/100,3), ")%-quantile.")
+              signif((1-ftlo(up))/100,3), ")%-quantile.")
       
     }
   }else{
