@@ -90,7 +90,7 @@ hatmatfun_gamm <- function(obj,
                           nr_smooths+1)
   
   nr_fixef <- length(attr(gamobj$pterms,"term.labels")) + 
-    attr(mod$gam$terms,"intercept")
+    attr(gamobj$terms,"intercept")
   # P <- Matrix::bdiag(append(rep(0,nr_fixef),
   #                           lapply(1:length(gamobj$smooth),
   #                                  function(i) gamobj$sp[i] * 
