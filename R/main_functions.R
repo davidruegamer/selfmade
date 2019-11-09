@@ -14,13 +14,13 @@ selinf <- function(
   alpha,
   multiple = 8,
   nr_testvals = multiple * 1000,
-  allow_smaller_alphas = FALSE
+  allow_smaller_alphas = TRUE
 )
 {
 
   # check if any sample has survived
   nrsurv <- length(survr)
-  if(nrsurv==0) return(data.frame(nrsurv = nrsurv, pval = 0, cil = -Inf, ciu = Inf))
+  if(nrsurv==0) return(data.frame(nrsurv = nrsurv, pval = NA, cil = -Inf, ciu = Inf))
 
   # which sample are more extreme than the observed value
   l2 <- survr > tstat
@@ -47,18 +47,26 @@ selinf <- function(
   ll <- min(which(!is.na(flovals) &
                     !is.nan(flovals) & 
                     flovals!=0))
+  ul <- min(which(!is.na(fupvals) &
+                    !is.nan(fupvals)))
   lu <- max(which(!is.na(flovals) &
                     !is.nan(flovals)))
+  uu <- max(which(!is.na(fupvals) &
+                    !is.nan(fupvals) & 
+                    fupvals!=1))
   
-  testvals_tbu <- testvals[c(ll,lu)]
+  testvals_low <- testvals[ll:lu]
+  testvals_up <- testvals[ul:uu]
 
-  if(any(flovals[c(ll,lu)]>0)){
+  if(any(flovals[c(ll,lu)] > 0) & any(testvals_low < tstat)){
     low <- try(uniroot(f = function(x) ftlo(x) - alpha/2,
-                       interval = testvals_tbu,
+                       interval = range(testvals_low),
                        extendInt = "upX")$root, silent = TRUE)
-    if(allow_smaller_alphas){
+    if(allow_smaller_alphas & class(low)=="try-error"){
       
-      low <- max(testvals_tbu)
+      if(tstat > 0) low <- max(testvals_low[testvals_low > 0 & testvals_low < tstat])
+      if(tstat < 0) low <- max(testvals_low[testvals_low < 0 & testvals_low < tstat])
+      
       warning("Lower interval limit is not the ",
               alpha/2*100, "%-quantile, but the (",
               signif(ftlo(low)/100,3), ")%-quantile.")
@@ -71,16 +79,19 @@ selinf <- function(
     low <- -Inf
   }
   
-  if(any(fupvals[c(ll,lu)]<1)){
-    up <- try(uniroot(f = function(x) ftup(x) - alpha/2,
-                      interval = testvals_tbu,
+  if(any(fupvals[c(ul,uu)] < 1) & any(testvals_up > tstat)){
+    up <- try(uniroot(f = function(x) ftlo(x) - 1 + alpha/2,
+                      interval = range(testvals_up),
                       extendInt = "downX")$root, silent = TRUE)
-    if(allow_smaller_alphas){
+    
+    if(allow_smaller_alphas & class(up)=="try-error"){
       
-      up <- maxse(testvals_tbu)
+      if(tstat > 0) up <- min(testvals_up[testvals_up > 0 & testvals_up > tstat])
+      if(tstat < 0) up <- min(testvals_up[testvals_up < 0 & testvals_up > tstat])
+      
       warning("Upper interval limit is not the ",
               (1-alpha/2)*100, "%-quantile, but the (",
-              signif((1-ftup(up))/100,3), ")%-quantile.")
+              signif(ftlo(up)/100,3), ")%-quantile.")
       
     }
   }else{
