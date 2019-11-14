@@ -80,7 +80,7 @@ selinf <- function(
   }
   
   if(any(fupvals[c(ul,uu)] < 1) & any(testvals_up > tstat)){
-    up <- try(uniroot(f = function(x) ftlo(x) - 1 + alpha/2,
+    up <- try(uniroot(f = function(x) ftup(x) - alpha/2,
                       interval = range(testvals_up),
                       extendInt = "downX")$root, silent = TRUE)
     
@@ -91,7 +91,7 @@ selinf <- function(
       
       warning("Upper interval limit is not the ",
               (1-alpha/2)*100, "%-quantile, but the (",
-              signif((1-ftlo(up))/100,3), ")%-quantile.")
+              signif((1-ftup(up))/100,3), ")%-quantile.")
       
     }
   }else{
