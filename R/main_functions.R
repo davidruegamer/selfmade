@@ -33,6 +33,9 @@ selinf <- function(
     pv <- 2*min(pe, 1-pe)
   # }
 
+  if(all(survr > tstat) | all(survr < tstat))
+    return(data.frame(nrsurv = nrsurv, pval = pv, cil = NA, ciu = NA))
+    
   # calculate the CIs
   ftlo <- function(t) sum(exp(survr_gr * t / (var_est[1])) * w[l2]) /
     sum(exp(survr * t / (var_est[1])) * w)
