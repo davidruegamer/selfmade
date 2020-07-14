@@ -171,12 +171,19 @@ testvec_for_mm <- function(
     
     if(length(mod@Gp)>3) stop("Please implement for more than 2 REs.")
     C <- cbind(X,Z)
-    if(is.null(G) || dim(G)[2] != dim(getME(mod,"ST")[[1]])[2])
-      A <- bdiag(list(matrix(0, ncol=ncol(X), nrow=ncol(X)), Lambda%*%Lambdat)) else
+    if(is.null(G) || dim(G)[2] != dim(getME(mod,"ST")[[1]])[2]){
+      A <- bdiag(list(matrix(0, ncol=ncol(X), nrow=ncol(X)), Lambda%*%Lambdat)) 
+    }else{
+      if(all(c(G)==0))
+        solveG <- G else solveG <- solve(G)
         A <- bdiag(list(matrix(0, ncol=ncol(X), nrow=ncol(X)),
-                        bdiag(list(solve(G))[rep(1,ncol(Z)/ncol(G))])))
+                        bdiag(list(solveG)[rep(1,ncol(Z)/ncol(G))])))
+    }
     if(class(A)=="try-error") # G does not fit to the selected model
+    {
       A <- bdiag(list(matrix(0, ncol=ncol(X), nrow=ncol(X)), Lambda%*%Lambdat))
+      warning("Could not create A, using the estimated covariance")
+    }
     if(is.null(VCOV)) VCOV <- Matrix::crossprod(C)/sig2 + A
     
   }
