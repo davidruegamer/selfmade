@@ -1,7 +1,7 @@
 Package: selfmade
 Title: SELective inference For Mixed and ADditive model Estimators
 Version: 0.0.0.9000
-Authors@R: person("David", "Ruegamer", email = "david.ruegamer@gmail.com.com", role = c("aut", "cre"))
+Authors@R: person("David", "Ruegamer", email = "david.ruegamer@gmail.com", role = c("aut", "cre"))
 Description: This package performs Monte Carlo approximation to conduct selective inference for mixed and additive regression models after model selection.
 Depends: R (>= 3.5.1)
 License: GPL (>= 2)
