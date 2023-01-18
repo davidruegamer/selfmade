@@ -10,4 +10,4 @@ install_github("davidruegamer/selfmade")
 
 ## Usage
 
-[View the vignette](http://htmlpreview.github.com/?https://github.com/davidruegamer/selfmade/blob/master/vignettes/selfmade_generic.html)
+[View the vignette](https://davidruegamer.github.io/selfmade/index.html)
