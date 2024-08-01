@@ -129,6 +129,8 @@ testvec_for_gamm4 <- function(mod, name, sigma2 = NULL, nrlocs=7,
 #' in the marginal case
 #' @param G true random effect covariance
 #' @param sig2 true error variance
+#' @param lincomb_matrix a matrix with number of columns corresponding to the 
+#' length of (beta, b). Used to test linear combinations of the coefficients.
 #'
 #' @details
 #' Function provides 2 different marginal test vectors
@@ -146,7 +148,8 @@ testvec_for_mm <- function(
   VCOV = NULL,
   G = NULL,
   sig2 = NULL,
-  efficient = TRUE
+  efficient = TRUE,
+  lincomb_matrix = NULL
 )
 {
   
@@ -217,10 +220,23 @@ testvec_for_mm <- function(
   }
   
   if(is.null(which)) if(marginal) which <- 1:ncol(X) else which <- 1:ncol(C)
+  if(!is.null(lincomb_matrix)) which <- 1:nrow(lincomb_matrix)
   vTs <- lapply(which, function(j){
     
-    vt <- vTs[j,]
-    if(!marginal) attr(vt, "var") <- V0inv[j,j]
+    if(is.null(lincomb_matrix)){
+      vt <- vTs[j,]
+    }else{
+      vt <- (lincomb_matrix%*%vTs)[j,]
+    }
+    if(!marginal){ 
+      
+      if(is.null(lincomb_matrix)){
+        attr(vt, "var") <- V0inv[j,j]
+      }else{
+        attr(vt, "var") <- (lincomb_matrix%*%V0inv%*%t(lincomb_matrix))[j,j]
+      }
+    }
+      
     return(vt)
     
   })

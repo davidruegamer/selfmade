@@ -47,6 +47,9 @@
 #' are excluded.
 #' @param efficient logical; whether or not to compute the test statistic based on
 #' an (efficient) weighted LS estimator instead of a OLS estimator for the marginal model
+#' @param lincomb_matrix a matrix with number of columns corresponding to the 
+#' length of (beta, b). Used to test linear combinations of the coefficients in the 
+#' mixed model setting.
 #'
 #'
 #' @details Note that the additive and conditional mixed model approach
@@ -150,7 +153,8 @@ mocasin <- function(
   vT = NULL,
   G = NULL,
   efficient = TRUE,
-  trace = TRUE
+  trace = TRUE,
+  lincomb_matrix = NULL
 )
 {
 
@@ -295,7 +299,8 @@ mocasin <- function(
                            marginal = !conditional,
                            G = G,
                            sig2 = VCOV_vT,
-                           which = wn)
+                           which = wn,
+                           lincomb_matrix = lincomb_matrix)
 
     }else{ # marginal
 
@@ -307,7 +312,8 @@ mocasin <- function(
                            VCOV = VCOV_vT,
                            sig2 = sigma2_sampling,
                            which = wn,
-                           efficient = efficient)
+                           efficient = efficient,
+                           lincomb_matrix = lincomb_matrix)
 
 
 
